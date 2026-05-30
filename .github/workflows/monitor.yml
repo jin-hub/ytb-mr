@@ -3,7 +3,11 @@ name: YouTube Monitor
 on:
   schedule:
     - cron: '*/5 * * * *'
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      force_push:
+        description: '强制推送测试图(填1)'
+        default: '0'
 
 permissions:
   contents: write
@@ -56,6 +60,7 @@ jobs:
           SHEET_ID: ${{ secrets.SHEET_ID }}
           BARK_KEY: ${{ secrets.BARK_KEY }}
           BARK_SERVER: ${{ secrets.BARK_SERVER }}
+          FORCE_PUSH: ${{ github.event.inputs.force_push }}
         run: python main.py
 
       - name: Commit data

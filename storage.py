@@ -36,11 +36,27 @@ def append_timeseries(rows):
 
 
 def load_timeseries():
-    """返回 list of dict。"""
+    """返回 list of dict。自动跳过 git 冲突标记行和损坏行。"""
     if not os.path.exists(TS_FILE):
         return []
-    with open(TS_FILE, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+    # 先按行清理掉 git 冲突标记（<<<<<<<、=======、>>>>>>>），避免污染数据
+    good_lines = []
+    with open(TS_FILE, encoding="utf-8") as f:
+        for line in f:
+            s = line.lstrip()
+            if s.startswith("<<<<<<<") or s.startswith("=======") or s.startswith(">>>>>>>"):
+                continue
+            good_lines.append(line)
+    import io
+    reader = csv.DictReader(io.StringIO("".join(good_lines)))
+    rows = []
+    for r in reader:
+        # 时间戳必须像 ISO 格式（以 20 开头的年份），否则视为损坏行跳过
+        ts = (r.get("timestamp_utc") or "").strip()
+        if not ts.startswith("20"):
+            continue
+        rows.append(r)
+    return rows
 
 
 def load_state():

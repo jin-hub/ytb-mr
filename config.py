@@ -44,4 +44,5 @@ AUTO_STOP_HOURS = 72      # 一轮监控满 72 小时后自动停（你也可在
 
 # ===== 指标 =====
 METRICS = ["views", "likes"]   # 播放量、点赞量
-METRIC_CN = {"views": "播放量", "likes": "点赞量"}
+METRIC_CN = {"views": "조회수", "likes": "좋아요"}
+METRIC_EN = {"views": "views", "likes": "likes"}  # 文件名用，纯英文

@@ -57,11 +57,20 @@ def _is_spike_at(rates, idx):
     med = _baseline(rates, idx)
     if med is None or med <= 0:
         return False, None, None
+    # 防低基数虚高：平时涨得太慢的成员（平直线），不参与台阶判断
+    if med < C.MIN_BASELINE_RATE:
+        return False, med, rates[idx]
     cur = rates[idx]
-    # 陡峰：当前速度 ≥ 平时的 SPIKE_MULT 倍
+    # 陡峰条件①：当前速度 ≥ 平时的 SPIKE_MULT 倍
     if cur < C.SPIKE_MULT * med:
         return False, med, cur
-    # 回落：之后 LOOKAHEAD 个点内，存在某点速度落回平时 FALLBACK_MULT 倍以内
+    # 陡峰条件②（双保险）：这一段“多涨出来的累计量”要够大
+    #   速度是“每分钟”，乘以该段时长（约5分钟）估算多涨的绝对量
+    extra_per_min = cur - med
+    seg_minutes = 5.0
+    if extra_per_min * seg_minutes < C.MIN_SPIKE_ABS:
+        return False, med, cur
+    # 回落条件：之后 LOOKAHEAD 个点内，必须出现落回平时 FALLBACK_MULT 倍以内
     fell_back = False
     for j in range(idx + 1, min(len(rates), idx + 1 + C.FALLBACK_LOOKAHEAD)):
         if np.isnan(rates[j]):

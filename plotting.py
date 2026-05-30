@@ -61,6 +61,17 @@ def _ensure():
     os.makedirs(OUT_DIR, exist_ok=True)
 
 
+def _safe(session):
+    """把场次标题转成纯英文/数字的安全文件名片段，避免 URL 里出现韩文导致 404。"""
+    import hashlib, re
+    # 保留 ASCII 字母数字，其余用短哈希代替
+    ascii_part = re.sub(r"[^A-Za-z0-9]+", "_", session).strip("_")
+    h = hashlib.md5(session.encode("utf-8")).hexdigest()[:6]
+    if ascii_part:
+        return f"{ascii_part}_{h}"
+    return f"s_{h}"
+
+
 def plot_trend(df_session, metric, session, kst_tz, window=None, fname=None):
     """
     df_session: 该场的长表，列 [time_kst(datetime), member, value]
@@ -84,13 +95,13 @@ def plot_trend(df_session, metric, session, kst_tz, window=None, fname=None):
         ax.plot(sub["time_kst"], sub["value"], "-", lw=2,
                 color=PALETTE[idx % len(PALETTE)], label=m, marker="o", ms=3)
 
-    metric_label = C.METRIC_CN[metric]
-    title = f"{session}  {metric_label}趋势"
+    metric_label = C.METRIC_CN[metric]  # 조회수 / 좋아요
+    title = f"{session}  {metric_label}"
     if window is not None:
-        title += f"  (第{int(window[0]//24)+1}天: {window[0]}~{window[1]}h)"
+        title += f"  (Day {int(window[0]//24)+1}: {window[0]}~{window[1]}h)"
     ax.set_title(title, fontsize=15, fontweight="bold", fontproperties=_fp())
     ax.set_ylabel(metric_label, fontproperties=_fp())
-    ax.set_xlabel("时间 (KST)", fontproperties=_fp())
+    ax.set_xlabel("KST", fontproperties=_fp())
     leg=ax.legend(loc="upper left", fontsize=10, ncol=2)
     [t.set_fontproperties(_fp()) for t in leg.get_texts()] if _fp() else None
     ax.grid(True, alpha=0.3)
@@ -99,7 +110,7 @@ def plot_trend(df_session, metric, session, kst_tz, window=None, fname=None):
     plt.tight_layout()
 
     if fname is None:
-        fname = f"{session}_{metric}.png".replace("/", "-").replace(" ", "_")
+        fname = f"{_safe(session)}_{metric}.png"
     path = os.path.join(OUT_DIR, fname)
     plt.savefig(path, bbox_inches="tight")
     plt.close(fig)
@@ -132,7 +143,7 @@ def plot_table(df_session, session, kst_tz, fname=None):
     fig_h = max(3, 0.32 * n + 1.5)
     fig, axes = plt.subplots(1, 2, figsize=(max(8, 1.6 * len(members) + 2), fig_h), dpi=130)
 
-    for ax, pv, name in zip(axes, [pv_views, pv_likes], ["播放量", "点赞量"]):
+    for ax, pv, name in zip(axes, [pv_views, pv_likes], [C.METRIC_CN["views"], C.METRIC_CN["likes"]]):
         ax.axis("off")
         ax.set_title(f"{session}  {name}", fontsize=12, fontweight="bold", fontproperties=_fp())
         cell_text = []
@@ -150,7 +161,7 @@ def plot_table(df_session, session, kst_tz, fname=None):
 
     plt.tight_layout()
     if fname is None:
-        fname = f"{session}_table.png".replace("/", "-").replace(" ", "_")
+        fname = f"{_safe(session)}_table.png"
     path = os.path.join(OUT_DIR, fname)
     plt.savefig(path, bbox_inches="tight")
     plt.close(fig)

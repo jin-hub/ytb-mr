@@ -83,6 +83,7 @@ def plot_trend(df_session, metric, session, kst_tz, window=None, fname=None):
     fig, ax = plt.subplots(figsize=(12, 7), dpi=140)
 
     members = list(dict.fromkeys(df_session["member"].tolist()))
+    plotted = 0
     for idx, m in enumerate(members):
         sub = df_session[df_session["member"] == m].sort_values("time_kst")
         if window is not None:
@@ -94,6 +95,7 @@ def plot_trend(df_session, metric, session, kst_tz, window=None, fname=None):
             continue
         ax.plot(sub["time_kst"], sub["value"], "-", lw=2,
                 color=PALETTE[idx % len(PALETTE)], label=m, marker="o", ms=3)
+        plotted += 1
 
     metric_label = C.METRIC_CN[metric]  # 조회수 / 좋아요
     title = f"{session}  {metric_label}"
@@ -105,6 +107,9 @@ def plot_trend(df_session, metric, session, kst_tz, window=None, fname=None):
     leg=ax.legend(loc="upper left", fontsize=10, ncol=2)
     [t.set_fontproperties(_fp()) for t in leg.get_texts()] if _fp() else None
     ax.grid(True, alpha=0.3)
+    # 时间轴：限制最多 ~8 个刻度，避免数据跨度小时 matplotlib 乱标日期
+    locator = mdates.AutoDateLocator(minticks=3, maxticks=8, tz=kst_tz)
+    ax.xaxis.set_major_locator(locator)
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%m/%d %H:%M", tz=kst_tz))
     fig.autofmt_xdate()
     plt.tight_layout()

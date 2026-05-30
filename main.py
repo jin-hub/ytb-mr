@@ -43,8 +43,10 @@ def flush_pushes():
     """统一发送队列里的所有推送（在图片已 push 到仓库之后调用）。"""
     for p in _PENDING_PUSH:
         try:
-            notify.push(p["title"], p["body"], url=p["url"],
-                        image=p["image"], group=p["group"])
+            # url 字段存的是图片链接：作为纯文本放正文末尾（不变蓝、不跳浏览器）
+            notify.push(p["title"], p["body"],
+                        image=p["image"], group=p["group"],
+                        link_in_body=p.get("url"))
         except Exception as e:
             print("推送失败:", e)
     print(f"[推送] 已发送 {len(_PENDING_PUSH)} 条")

@@ -91,18 +91,16 @@ def commit_and_push():
         return True
     run(f'git commit -m "update data {now_utc().isoformat()}"')
 
-    # 重试推送：每次先 rebase 远程最新（autostash 防冲突），再 push
+    # 重试推送：每次先 rebase 远程最新；冲突则放弃本次合并、以远程为准，
+    # 本地新数据下一轮会重新采集补上（绝不把冲突标记写进文件）。
     for attempt in range(5):
         run("git fetch origin")
         rb = run(f"git rebase origin/{BRANCH}")
         if rb.returncode != 0:
-            # rebase 冲突：data 是机器追加文件，直接用两边合并后的结果继续
-            run("git add data/")
-            cont = run("git -c core.editor=true rebase --continue")
-            if cont.returncode != 0:
-                run("git rebase --abort")
-                # 退而求其次：用 merge 策略
-                run(f"git merge -X ours origin/{BRANCH} --no-edit")
+            run("git rebase --abort")
+            # 以远程为准重置，丢弃本地这次提交（数据下轮补），保证文件干净
+            run(f"git reset --hard origin/{BRANCH}")
+            return True  # 本轮放弃提交，但仓库是干净的，不报错
         push = run(f"git push origin HEAD:{BRANCH}")
         if push.returncode == 0:
             print(f"[提交] 数据已推送（第{attempt+1}次尝试）")

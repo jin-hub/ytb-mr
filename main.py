@@ -20,7 +20,6 @@ import config as C
 import sheet_reader
 import youtube_fetch
 import storage
-import detector
 import plotting
 import notify
 
@@ -150,24 +149,23 @@ def main():
                 "session": it["session"], "member": it["member"],
                 "start_utc": now.isoformat(),
                 "pushed_milestones": [],
-                "last_alert": {},   # metric -> iso time
             }
-    # 表格里不再“运行”的（被勾停止）：标记结束本轮，下次再运行视为新一轮
+    # 表格里不再“运行”的（你手动勾了停止）：删除其运行态，下次再运行视为新一轮
     for key in list(state.keys()):
         if key not in running_keys:
-            # 该轮结束，删除其运行态（重新开始时会重建，从新 start 计时）
             state.pop(key, None)
 
-    # 自动停止：超过 AUTO_STOP_HOURS
+    # 注意：满 72h 后不再推图，是因为最后一个里程碑就是 72h，推完后
+    # pushed_milestones 已包含全部里程碑，循环自然不再推任何图。
+    # 此处【不删除 state】，这样：① 采集照常继续（只要表格状态是“运行”）
+    # ② 不会因删状态而重新计时。你无需手动改“停止”。
+    # 仅打印提示，便于你了解某场已过 72h。
     for key in list(running_keys):
         st = state.get(key)
         if st:
             elapsed_h = (now - parse_iso(st["start_utc"])).total_seconds() / 3600
             if elapsed_h >= C.AUTO_STOP_HOURS:
-                print(f"{key} 已满 {C.AUTO_STOP_HOURS}h，本轮自动停止。")
-                # 仍保留数据；从运行集合移除，状态删除
-                state.pop(key, None)
-                running_keys.discard(key)
+                print(f"{key} 已满 {C.AUTO_STOP_HOURS}h：不再推图，但继续记录数据。")
 
     # ---- 4. 载入全量时间序列做检测与画图 ----
     ts = storage.load_timeseries()
@@ -178,157 +176,85 @@ def main():
         for col in ["views", "likes"]:
             df[col] = pd.to_numeric(df[col], errors="coerce")
 
-    # ---- 5. 异常检测（按 场+成员+指标） ----
-    for it in items:
-        key = storage.session_member_key(it["session"], it["member"])
-        st = state.get(key)
-        if not st:
-            continue
-        start = parse_iso(st["start_utc"])
-        # 本轮数据
-        dseg = df[(df["session"] == it["session"]) &
-                  (df["timestamp_utc"] >= start)].copy()
-        if dseg.empty:
-            continue
-
-        for metric in C.METRICS:
-            run_for_metric_alert(it, metric, st, df, start, now)
-
-    # ---- 6. 里程碑定时推送（按场） ----
+    # ---- 5. 里程碑定时推送（按场）----
     sessions = list(dict.fromkeys(it["session"] for it in items))
     for session in sessions:
-        # 该场任意成员的最早 start 作为该场本轮起点
         keys = [k for k in state if state[k]["session"] == session]
         if not keys:
             continue
         start = min(parse_iso(state[k]["start_utc"]) for k in keys)
-        elapsed_h = (now - start).total_seconds() / 3600
+        elapsed_min = (now - start).total_seconds() / 60
         pushed = set()
         for k in keys:
             pushed |= set(state[k]["pushed_milestones"])
 
-        for mh in C.PUSH_MILESTONES_H:
-            if mh in pushed:
+        for mm, win in C.PUSH_MILESTONES:
+            if mm in pushed:
                 continue
-            if elapsed_h >= mh:
-                push_milestone(session, mh, df, start, keys, state)
+            if elapsed_min >= mm:
+                push_milestone(session, mm, win, df, start, keys, state)
                 for k in keys:
-                    if mh not in state[k]["pushed_milestones"]:
-                        state[k]["pushed_milestones"].append(mh)
+                    if mm not in state[k]["pushed_milestones"]:
+                        state[k]["pushed_milestones"].append(mm)
 
     storage.save_state(state)
     print("本轮运行完成。")
 
 
-def run_for_metric_alert(it, metric, st, df, start, now):
-    """对单个 场+成员+指标 做台阶检测，命中则把报警图入队（不立即推）。"""
-    session, member = it["session"], it["member"]
-    dseg_all = df[(df["session"] == session)].copy()
-    dmem = dseg_all[(dseg_all["member"] == member) &
-                    (dseg_all["timestamp_utc"] >= start)].sort_values("timestamp_utc")
-    dmem = dmem.dropna(subset=[metric])
-    if len(dmem) < C.MIN_POINTS_TO_JUDGE + 2:
-        return
-
-    t0 = dmem["timestamp_utc"].min()
-    tmin = [(t - t0).total_seconds() / 60 for t in dmem["timestamp_utc"]]
-    vals = dmem[metric].tolist()
-
-    members = dseg_all["member"].unique().tolist()
-
-    # 给 detector 用：返回某成员在“速率序列”上的完整 rates 数组（按各自时间）
-    def member_rates(mm):
-        dm = dseg_all[(dseg_all["member"] == mm) &
-                      (dseg_all["timestamp_utc"] >= start)].sort_values("timestamp_utc").dropna(subset=[metric])
-        if len(dm) < 2:
-            return None
-        tt0 = dm["timestamp_utc"].min()
-        tt = [(t - tt0).total_seconds() / 60 for t in dm["timestamp_utc"]]
-        _, rr = detector.compute_rates(tt, dm[metric].tolist())
-        return rr
-
-    # 全组各成员的 rates（条件③：是否全员一起陡峰）。
-    _group_cache = {mm: member_rates(mm) for mm in members}
-
-    def group_rates_at(idx):
-        return list(_group_cache.values())
-
-    res = detector.detect_step((tmin, vals), group_rates_at)
-    if not res:
-        return
-
-    # 去抖：同一(场,成员,指标) ALERT_DEDUP_MIN 分钟内只报一次
-    last = st["last_alert"].get(metric)
-    if last and (now - parse_iso(last)).total_seconds() / 60 < C.ALERT_DEDUP_MIN:
-        return
-    st["last_alert"][metric] = now.isoformat()
-
-    # 突变点对应的真实时刻：spike_time_min 是相对 t0 的分钟数
-    spike_time = t0 + timedelta(minutes=res["spike_time_min"])
-    # 报警图聚焦三段：突变点前 ALERT_BACK_MIN 分钟 ~ 突变点后 ALERT_FWD_MIN 分钟
-    lo = spike_time - timedelta(minutes=C.ALERT_BACK_MIN)
-    hi = spike_time + timedelta(minutes=C.ALERT_FWD_MIN)
-    dctx = dseg_all[(dseg_all["timestamp_utc"] >= lo) &
-                    (dseg_all["timestamp_utc"] <= hi)].copy()
-    long = dctx.melt(id_vars=["timestamp_utc", "time_kst", "member"],
-                     value_vars=[metric], var_name="metric", value_name="value").dropna(subset=["value"])
-    fname = f"ALERT_{plotting._safe(session)}_{metric}_{spike_time.strftime('%Y%m%d%H%M')}.png"
-    path = plotting.plot_trend(
-        pd.DataFrame({"time_kst": long["time_kst"],
-                      "member": long["member"],
-                      "value": long["value"]}),
-        metric, session, KST, window=None, fname=fname)
-
-    link = raw_url(path)
-    at_kst = spike_time.astimezone(KST).strftime("%m/%d %H:%M")
-    queue_push(
-        title=f"⚠️ {session}",
-        body=f"{member} {C.METRIC_CN[metric]} 异常台阶 (~{at_kst} KST)",
-        url=link, image=link, group=session,
-    )
-    print(f"[报警] {session} {member} {metric} 台阶@{at_kst} "
-          f"平时{res['baseline']:.1f}→突变{res['spike_rate']:.1f}")
+def _fmt_label(mm):
+    """里程碑分钟 -> 人类可读标签：30min/1h/3h/6h/24h/48h/72h"""
+    if mm < 60:
+        return f"{mm}min"
+    return f"{mm//60}h"
 
 
-def push_milestone(session, mh, df, start, keys, state):
-    """到达里程碑，推该场趋势图（点赞+播放）+ 数据表格图。"""
-    window = C.WINDOWED_MILESTONES.get(mh)  # 48->(24,48), 72->(48,72), 否则 None
-    dseg = df[(df["session"] == session) & (df["timestamp_utc"] >= start)].copy()
+def push_milestone(session, mm, win, df, start, keys, state):
+    """
+    到达里程碑：推 2 张趋势图（조회수+좋아요），范围 = start+win[0] ~ start+win[1] 分钟。
+    若该里程碑在 TABLE_MILESTONES 中，再推 1 张“排名快照”数据表（当前时刻）。
+    """
+    lo = start + timedelta(minutes=win[0])
+    hi = start + timedelta(minutes=win[1])
+    dseg = df[(df["session"] == session) &
+              (df["timestamp_utc"] >= lo) &
+              (df["timestamp_utc"] <= hi)].copy()
     if dseg.empty:
+        print(f"[里程碑] {session} {_fmt_label(mm)} 区间内无数据，跳过")
         return
 
-    # 趋势图：两张
-    links = {}
+    label = _fmt_label(mm)
+    # 时间范围文字（KST），用于图标题第二行
+    lo_kst = lo.astimezone(KST).strftime("%m/%d %H:%M")
+    hi_kst = hi.astimezone(KST).strftime("%m/%d %H:%M")
+    range_txt = f"{lo_kst}~{hi_kst} KST"
+
+    # ---- 2 张趋势图 ----
     for metric in C.METRICS:
         long = dseg.dropna(subset=[metric])[["time_kst", "member", metric]].rename(columns={metric: "value"})
         if long.empty:
             continue
-        fname = f"{plotting._safe(session)}_{metric}_{mh:g}h.png"
-        path = plotting.plot_trend(long, metric, session, KST, window=window, fname=fname)
-        links[metric] = raw_url(path)
+        fname = f"{plotting._safe(session)}_{metric}_{mm}min.png"
+        # 趋势图标题两行（图内不放 emoji，避免 matplotlib 显示方框；emoji 留在推送标题里）
+        title2 = f"{session} | {C.METRIC_CN[metric]}\n{range_txt}"
+        path = plotting.plot_trend(long, metric, session, KST,
+                                   window=None, fname=fname, title_override=title2)
+        link = raw_url(path)
+        queue_push(f"📈 {session} | {C.METRIC_CN[metric]}",
+                   f"⏰ {range_txt}", url=link, image=link, group=session)
 
-    # 数据表格图
-    longt = dseg.melt(id_vars=["timestamp_utc", "time_kst", "member"],
-                      value_vars=C.METRICS, var_name="metric", value_name="value").dropna(subset=["value"])
-    if window is not None:
-        lo = start + timedelta(hours=window[0]); hi = start + timedelta(hours=window[1])
-        longt = longt[(longt["timestamp_utc"] >= lo) & (longt["timestamp_utc"] <= hi)]
-    table_path = plotting.plot_table(longt, session, KST,
-                                     fname=f"{plotting._safe(session)}_table_{mh:g}h.png")
-    table_link = raw_url(table_path)
+    # ---- 数据表（排名快照，仅特定里程碑）----
+    if mm in C.TABLE_MILESTONES:
+        # 取“当前时刻”每个成员最新一条数据做排名
+        snap = dseg.sort_values("timestamp_utc").groupby("member").tail(1)
+        snap_time = dseg["timestamp_utc"].max().astimezone(KST).strftime("%m/%d %H:%M")
+        table_fname = f"{plotting._safe(session)}_rank_{mm}min.png"
+        table_title = f"📝 {session} | {label} | {snap_time} KST"
+        tpath = plotting.plot_rank_table(snap, session, table_title, fname=table_fname)
+        tlink = raw_url(tpath)
+        queue_push(f"📝 {session} | {label}",
+                   f"{snap_time} KST", url=tlink, image=tlink, group=session)
 
-    # 里程碑标签：0.5 显示为 "0.5h"，整数显示为 "1h/3h..."，避免 int(0.5)=0 变成 "0h"
-    _mh_label = (f"{mh:g}h")  # 0.5->'0.5h', 1.0->'1h', 24.0->'24h'
-    label = _mh_label if window is None else f"Day{int(window[0]//24)+1}({int(window[0])}~{int(window[1])}h)"
-    if "likes" in links:
-        queue_push(f"📊 {session} | {label} 좋아요",
-                   "", url=links["likes"], image=links["likes"], group=session)
-    if "views" in links:
-        queue_push(f"📊 {session} | {label} 조회수",
-                   "", url=links["views"], image=links["views"], group=session)
-    queue_push(f"📋 {session} | {label}",
-               "", url=table_link, image=table_link, group=session)
-    print(f"[里程碑] {session} {label} 已入队")
+    print(f"[里程碑] {session} {label} 已入队（范围 {range_txt}）")
 
 
 def _parse_kst(s):

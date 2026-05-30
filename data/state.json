@@ -3,28 +3,40 @@
     "session": "0530 MCOUNTDOWN 가로 직캠",
     "member": "상원",
     "start_utc": "2026-05-30T07:07:18.403347+00:00",
-    "pushed_milestones": [],
+    "pushed_milestones": [
+      0.5,
+      1
+    ],
     "last_alert": {}
   },
   "0530 MCOUNTDOWN 가로 직캠|||씬롱": {
     "session": "0530 MCOUNTDOWN 가로 직캠",
     "member": "씬롱",
     "start_utc": "2026-05-30T07:07:18.403347+00:00",
-    "pushed_milestones": [],
+    "pushed_milestones": [
+      0.5,
+      1
+    ],
     "last_alert": {}
   },
   "0530 MCOUNTDOWN 가로 직캠|||아르노": {
     "session": "0530 MCOUNTDOWN 가로 직캠",
     "member": "아르노",
     "start_utc": "2026-05-30T07:07:18.403347+00:00",
-    "pushed_milestones": [],
+    "pushed_milestones": [
+      0.5,
+      1
+    ],
     "last_alert": {}
   },
   "0530 MCOUNTDOWN 가로 직캠|||준서": {
     "session": "0530 MCOUNTDOWN 가로 직캠",
     "member": "준서",
     "start_utc": "2026-05-30T07:07:18.403347+00:00",
-    "pushed_milestones": [],
+    "pushed_milestones": [
+      0.5,
+      1
+    ],
     "last_alert": {}
   }
 }

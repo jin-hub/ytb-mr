@@ -57,7 +57,8 @@
     "member": "상원",
     "start_utc": "2026-05-30T09:12:20.156003+00:00",
     "pushed_milestones": [
-      0.5
+      0.5,
+      1
     ],
     "last_alert": {}
   },
@@ -66,7 +67,8 @@
     "member": "안신",
     "start_utc": "2026-05-30T09:12:20.156003+00:00",
     "pushed_milestones": [
-      0.5
+      0.5,
+      1
     ],
     "last_alert": {}
   },
@@ -75,7 +77,8 @@
     "member": "씬롱",
     "start_utc": "2026-05-30T09:12:20.156003+00:00",
     "pushed_milestones": [
-      0.5
+      0.5,
+      1
     ],
     "last_alert": {}
   },
@@ -84,7 +87,8 @@
     "member": "아르노",
     "start_utc": "2026-05-30T09:12:20.156003+00:00",
     "pushed_milestones": [
-      0.5
+      0.5,
+      1
     ],
     "last_alert": {}
   },
@@ -93,7 +97,8 @@
     "member": "리오",
     "start_utc": "2026-05-30T09:12:20.156003+00:00",
     "pushed_milestones": [
-      0.5
+      0.5,
+      1
     ],
     "last_alert": {}
   },
@@ -102,7 +107,8 @@
     "member": "상현",
     "start_utc": "2026-05-30T09:12:20.156003+00:00",
     "pushed_milestones": [
-      0.5
+      0.5,
+      1
     ],
     "last_alert": {
       "views": "2026-05-30T10:01:06.823484+00:00"
@@ -113,7 +119,8 @@
     "member": "준서",
     "start_utc": "2026-05-30T09:12:20.156003+00:00",
     "pushed_milestones": [
-      0.5
+      0.5,
+      1
     ],
     "last_alert": {}
   }

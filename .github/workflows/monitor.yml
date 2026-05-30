@@ -36,6 +36,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # 完整历史，供 Python 内部 rebase/push 使用
+          persist-credentials: true
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -82,16 +85,5 @@ jobs:
           MANUAL_DO_PUSH: ${{ github.event.inputs.do_push }}
           MANUAL_TRIGGER: ${{ github.event_name == 'workflow_dispatch' }}
         run: python main.py
-
-      - name: Commit data
-        run: |
-          git config user.name "github-actions"
-          git config user.email "actions@github.com"
-          git add data/ || true
-          if ! git diff --staged --quiet; then
-            git commit -m "update data $(date -u +%FT%TZ)"
-            git pull --rebase --autostash || true
-            git push || (git pull --rebase --autostash && git push)
-          else
-            echo "无数据变化"
-          fi
+      # 注：数据提交与推送已移入 main.py 内部（commit_and_push，带冲突重试），
+      # 不再需要单独的 Commit data 步骤。

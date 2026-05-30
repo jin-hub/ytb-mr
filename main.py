@@ -242,7 +242,7 @@ def push_milestone(session, mh, df, start, keys, state):
         long = dseg.dropna(subset=[metric])[["time_kst", "member", metric]].rename(columns={metric: "value"})
         if long.empty:
             continue
-        fname = f"{plotting._safe(session)}_{metric}_{int(mh)}h.png"
+        fname = f"{plotting._safe(session)}_{metric}_{mh:g}h.png"
         path = plotting.plot_trend(long, metric, session, KST, window=window, fname=fname)
         links[metric] = raw_url(path)
 
@@ -253,10 +253,12 @@ def push_milestone(session, mh, df, start, keys, state):
         lo = start + timedelta(hours=window[0]); hi = start + timedelta(hours=window[1])
         longt = longt[(longt["timestamp_utc"] >= lo) & (longt["timestamp_utc"] <= hi)]
     table_path = plotting.plot_table(longt, session, KST,
-                                     fname=f"{plotting._safe(session)}_table_{int(mh)}h.png")
+                                     fname=f"{plotting._safe(session)}_table_{mh:g}h.png")
     table_link = raw_url(table_path)
 
-    label = f"{int(mh)}h" if window is None else f"Day{int(window[0]//24)+1}({window[0]}~{window[1]}h)"
+    # 里程碑标签：0.5 显示为 "0.5h"，整数显示为 "1h/3h..."，避免 int(0.5)=0 变成 "0h"
+    _mh_label = (f"{mh:g}h")  # 0.5->'0.5h', 1.0->'1h', 24.0->'24h'
+    label = _mh_label if window is None else f"Day{int(window[0]//24)+1}({int(window[0])}~{int(window[1])}h)"
     if "likes" in links:
         notify.push(f"📊 {session} | {label} 좋아요",
                     "", url=links["likes"], image=links["likes"], group=session)
@@ -363,8 +365,12 @@ def manual_push():
 
 
 if __name__ == "__main__":
-    # 无论定时还是手动，都先跑一次 main()（采集+检测+里程碑），保证数据最新
+    # 无论定时还是手动，都先跑 main()（采集+检测+里程碑，这些该推的会推）
     main()
-    # 若是手动触发，额外做一次灵活推送（按场次/时间范围/多选）
-    if os.environ.get("MANUAL_TRIGGER") == "true":
+    # 是否执行"灵活全量推送"由 do_push 控制：
+    # - 你在 GitHub 网页手动 Run workflow：do_push 默认 'yes' → 推送
+    # - cron-job.org 外部定时：请求体显式传 do_push='no' → 只采集，不刷屏
+    _do_push = os.environ.get("MANUAL_DO_PUSH", "yes").strip().lower()
+    _is_manual = os.environ.get("MANUAL_TRIGGER") == "true"
+    if _is_manual and _do_push not in ("no", "false", "0", ""):
         manual_push()

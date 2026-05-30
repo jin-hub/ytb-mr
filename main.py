@@ -408,21 +408,22 @@ def manual_push():
             notify.push(f"⚠️ {session}", "该时间段无数据。", group=session)
             continue
 
+        _ts = now_utc().strftime("%Y%m%d%H%M%S")
         if want_views:
             long = dseg.dropna(subset=["views"])[["time_kst", "member", "views"]].rename(columns={"views": "value"})
             if not long.empty:
-                p = plotting.plot_trend(long, "views", session, KST, fname=f"M_{plotting._safe(session)}_views.png")
+                p = plotting.plot_trend(long, "views", session, KST, fname=f"M_{plotting._safe(session)}_views_{_ts}.png")
                 queue_push(f"🔔 {session} | {C.METRIC_CN['views']}", "", url=raw_url(p), image=raw_url(p), group=session)
         if want_likes:
             long = dseg.dropna(subset=["likes"])[["time_kst", "member", "likes"]].rename(columns={"likes": "value"})
             if not long.empty:
-                p = plotting.plot_trend(long, "likes", session, KST, fname=f"M_{plotting._safe(session)}_likes.png")
+                p = plotting.plot_trend(long, "likes", session, KST, fname=f"M_{plotting._safe(session)}_likes_{_ts}.png")
                 queue_push(f"🔔 {session} | {C.METRIC_CN['likes']}", "", url=raw_url(p), image=raw_url(p), group=session)
         if want_table:
             longt = dseg.melt(id_vars=["timestamp_utc", "time_kst", "member"],
                               value_vars=C.METRICS, var_name="metric", value_name="value").dropna(subset=["value"])
             if not longt.empty:
-                tp = plotting.plot_table(longt, session, KST, fname=f"M_{plotting._safe(session)}_table.png")
+                tp = plotting.plot_table(longt, session, KST, fname=f"M_{plotting._safe(session)}_table_{_ts}.png")
                 queue_push(f"🔔 {session} | 데이터", "", url=raw_url(tp), image=raw_url(tp), group=session)
         print(f"[手动推送] {session} 已推送")
 

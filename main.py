@@ -29,6 +29,28 @@ REPO = os.environ.get("GITHUB_REPOSITORY", "")          # "user/repo"
 BRANCH = os.environ.get("GITHUB_REF_NAME", "main")
 SHEET_ID = os.environ["SHEET_ID"]
 
+# 待推送队列：所有图先生成、存盘，等 commit+push 成功后再统一发 Bark，
+# 这样点开通知图片一定已在线（不再等1分钟、不再404）。
+_PENDING_PUSH = []
+
+
+def queue_push(title, body, url=None, image=None, group=None):
+    """把一条待推送加入队列，不立即发送。"""
+    _PENDING_PUSH.append({"title": title, "body": body, "url": url,
+                          "image": image, "group": group})
+
+
+def flush_pushes():
+    """统一发送队列里的所有推送（在图片已 push 到仓库之后调用）。"""
+    for p in _PENDING_PUSH:
+        try:
+            notify.push(p["title"], p["body"], url=p["url"],
+                        image=p["image"], group=p["group"])
+        except Exception as e:
+            print("推送失败:", e)
+    print(f"[推送] 已发送 {len(_PENDING_PUSH)} 条")
+    _PENDING_PUSH.clear()
+
 
 def raw_url(rel_path):
     """把仓库内文件路径转成可公开访问的 raw 链接（看高清图用）。"""
@@ -43,6 +65,51 @@ def now_utc():
 
 def parse_iso(s):
     return datetime.fromisoformat(s)
+
+
+def commit_and_push():
+    """
+    把 data/（CSV + 图）提交并推送到仓库。
+    带重试，解决多次运行并发导致的 git 冲突（之前 Commit data 失败的根因）。
+    成功返回 True。
+    """
+    import subprocess
+
+    def run(cmd):
+        return subprocess.run(cmd, shell=True, cwd=os.path.dirname(__file__) or ".",
+                              capture_output=True, text=True)
+
+    run('git config user.name "github-actions"')
+    run('git config user.email "actions@github.com"')
+    # 确保在 main 分支上（GitHub Actions 默认可能是 detached HEAD）
+    run(f"git checkout -B {BRANCH}")
+    run("git add data/")
+    # 没有变化就跳过
+    staged = run("git diff --staged --quiet")
+    if staged.returncode == 0:
+        print("无数据变化，无需提交。")
+        return True
+    run(f'git commit -m "update data {now_utc().isoformat()}"')
+
+    # 重试推送：每次先 rebase 远程最新（autostash 防冲突），再 push
+    for attempt in range(5):
+        run("git fetch origin")
+        rb = run(f"git rebase origin/{BRANCH}")
+        if rb.returncode != 0:
+            # rebase 冲突：data 是机器追加文件，直接用两边合并后的结果继续
+            run("git add data/")
+            cont = run("git -c core.editor=true rebase --continue")
+            if cont.returncode != 0:
+                run("git rebase --abort")
+                # 退而求其次：用 merge 策略
+                run(f"git merge -X ours origin/{BRANCH} --no-edit")
+        push = run(f"git push origin HEAD:{BRANCH}")
+        if push.returncode == 0:
+            print(f"[提交] 数据已推送（第{attempt+1}次尝试）")
+            return True
+        print(f"[提交] 推送失败，重试 {attempt+1}/5: {push.stderr.strip()[:120]}")
+    print("[提交] 多次重试后仍失败")
+    return False
 
 
 def main():
@@ -156,77 +223,73 @@ def main():
 
 
 def run_for_metric_alert(it, metric, st, df, start, now):
-    """对单个 场+成员+指标 做异常检测并推送。"""
+    """对单个 场+成员+指标 做台阶检测，命中则把报警图入队（不立即推）。"""
     session, member = it["session"], it["member"]
     dseg_all = df[(df["session"] == session)].copy()
     dmem = dseg_all[(dseg_all["member"] == member) &
                     (dseg_all["timestamp_utc"] >= start)].sort_values("timestamp_utc")
     dmem = dmem.dropna(subset=[metric])
-    if len(dmem) < C.MIN_POINTS_TO_JUDGE + 1:
+    if len(dmem) < C.MIN_POINTS_TO_JUDGE + 2:
         return
 
     t0 = dmem["timestamp_utc"].min()
     tmin = [(t - t0).total_seconds() / 60 for t in dmem["timestamp_utc"]]
     vals = dmem[metric].tolist()
 
-    # 全组在某速率索引处的速率（B条件用）
     members = dseg_all["member"].unique().tolist()
 
-    def group_at(i):
-        out = []
-        # 第 i 个速率点对应 dmem 的第 i+1 个数据时间
-        if i + 1 >= len(dmem):
-            return out
-        t_ref = dmem["timestamp_utc"].iloc[i + 1]
-        for mm in members:
-            dm = dseg_all[(dseg_all["member"] == mm) &
-                          (dseg_all["timestamp_utc"] >= start)].sort_values("timestamp_utc").dropna(subset=[metric])
-            if len(dm) < 2:
-                out.append(float("nan")); continue
-            # 取离 t_ref 最近的两个点算速率
-            dm2 = dm[dm["timestamp_utc"] <= t_ref].tail(2)
-            if len(dm2) < 2:
-                out.append(float("nan")); continue
-            dt = (dm2["timestamp_utc"].iloc[1] - dm2["timestamp_utc"].iloc[0]).total_seconds() / 60
-            if dt <= 0 or dt > C.GAP_THRESHOLD_MIN:
-                out.append(float("nan")); continue
-            out.append((dm2[metric].iloc[1] - dm2[metric].iloc[0]) / dt)
-        return out
+    # 给 detector 用：返回某成员在“速率序列”上的完整 rates 数组（按各自时间）
+    def member_rates(mm):
+        dm = dseg_all[(dseg_all["member"] == mm) &
+                      (dseg_all["timestamp_utc"] >= start)].sort_values("timestamp_utc").dropna(subset=[metric])
+        if len(dm) < 2:
+            return None
+        tt0 = dm["timestamp_utc"].min()
+        tt = [(t - tt0).total_seconds() / 60 for t in dm["timestamp_utc"]]
+        _, rr = detector.compute_rates(tt, dm[metric].tolist())
+        return rr
 
-    res = detector.detect_latest((tmin, vals), group_at)
+    # 全组各成员的 rates（条件③：是否全员一起陡峰）。
+    _group_cache = {mm: member_rates(mm) for mm in members}
+
+    def group_rates_at(idx):
+        return list(_group_cache.values())
+
+    res = detector.detect_step((tmin, vals), group_rates_at)
     if not res:
         return
 
-    # 去抖
+    # 去抖：同一(场,成员,指标) ALERT_DEDUP_MIN 分钟内只报一次
     last = st["last_alert"].get(metric)
     if last and (now - parse_iso(last)).total_seconds() / 60 < C.ALERT_DEDUP_MIN:
         return
     st["last_alert"][metric] = now.isoformat()
 
-    # 画异常前后 ±ALERT_CONTEXT_HOURS 的局部图（客观、无标注、全场成员）
-    at = dmem["timestamp_utc"].iloc[-1]
-    lo = at - timedelta(hours=C.ALERT_CONTEXT_HOURS)
-    hi = at + timedelta(hours=C.ALERT_CONTEXT_HOURS)
-    dctx = dseg_all[(dseg_all["timestamp_utc"] >= lo) & (dseg_all["timestamp_utc"] <= hi)].copy()
+    # 突变点对应的真实时刻：spike_time_min 是相对 t0 的分钟数
+    spike_time = t0 + timedelta(minutes=res["spike_time_min"])
+    # 报警图聚焦三段：突变点前 ALERT_BACK_MIN 分钟 ~ 突变点后 ALERT_FWD_MIN 分钟
+    lo = spike_time - timedelta(minutes=C.ALERT_BACK_MIN)
+    hi = spike_time + timedelta(minutes=C.ALERT_FWD_MIN)
+    dctx = dseg_all[(dseg_all["timestamp_utc"] >= lo) &
+                    (dseg_all["timestamp_utc"] <= hi)].copy()
     long = dctx.melt(id_vars=["timestamp_utc", "time_kst", "member"],
                      value_vars=[metric], var_name="metric", value_name="value").dropna(subset=["value"])
-    long = long.rename(columns={})
-    fname = f"ALERT_{plotting._safe(session)}_{metric}_{at.strftime('%Y%m%d%H%M')}.png"
-    df_for_plot = long[["time_kst", "member", "value"]]
+    fname = f"ALERT_{plotting._safe(session)}_{metric}_{spike_time.strftime('%Y%m%d%H%M')}.png"
     path = plotting.plot_trend(
-        pd.DataFrame({"time_kst": df_for_plot["time_kst"],
-                      "member": df_for_plot["member"],
-                      "value": df_for_plot["value"]}),
+        pd.DataFrame({"time_kst": long["time_kst"],
+                      "member": long["member"],
+                      "value": long["value"]}),
         metric, session, KST, window=None, fname=fname)
 
     link = raw_url(path)
-    at_kst = at.astimezone(KST).strftime("%m/%d %H:%M")
-    notify.push(
+    at_kst = spike_time.astimezone(KST).strftime("%m/%d %H:%M")
+    queue_push(
         title=f"⚠️ {session}",
-        body=f"{member} {C.METRIC_CN[metric]} ({at_kst} KST)",
+        body=f"{member} {C.METRIC_CN[metric]} 异常台阶 (~{at_kst} KST)",
         url=link, image=link, group=session,
     )
-    print(f"[报警] {session} {member} {metric} @ {at_kst}")
+    print(f"[报警] {session} {member} {metric} 台阶@{at_kst} "
+          f"平时{res['baseline']:.1f}→突变{res['spike_rate']:.1f}")
 
 
 def push_milestone(session, mh, df, start, keys, state):
@@ -260,14 +323,14 @@ def push_milestone(session, mh, df, start, keys, state):
     _mh_label = (f"{mh:g}h")  # 0.5->'0.5h', 1.0->'1h', 24.0->'24h'
     label = _mh_label if window is None else f"Day{int(window[0]//24)+1}({int(window[0])}~{int(window[1])}h)"
     if "likes" in links:
-        notify.push(f"📊 {session} | {label} 좋아요",
-                    "", url=links["likes"], image=links["likes"], group=session)
+        queue_push(f"📊 {session} | {label} 좋아요",
+                   "", url=links["likes"], image=links["likes"], group=session)
     if "views" in links:
-        notify.push(f"📊 {session} | {label} 조회수",
-                    "", url=links["views"], image=links["views"], group=session)
-    notify.push(f"📋 {session} | {label}",
-                "", url=table_link, image=table_link, group=session)
-    print(f"[里程碑] {session} {label} 已推送")
+        queue_push(f"📊 {session} | {label} 조회수",
+                   "", url=links["views"], image=links["views"], group=session)
+    queue_push(f"📋 {session} | {label}",
+               "", url=table_link, image=table_link, group=session)
+    print(f"[里程碑] {session} {label} 已入队")
 
 
 def _parse_kst(s):
@@ -349,28 +412,35 @@ def manual_push():
             long = dseg.dropna(subset=["views"])[["time_kst", "member", "views"]].rename(columns={"views": "value"})
             if not long.empty:
                 p = plotting.plot_trend(long, "views", session, KST, fname=f"M_{plotting._safe(session)}_views.png")
-                notify.push(f"🔔 {session} | {C.METRIC_CN['views']}", "", url=raw_url(p), image=raw_url(p), group=session)
+                queue_push(f"🔔 {session} | {C.METRIC_CN['views']}", "", url=raw_url(p), image=raw_url(p), group=session)
         if want_likes:
             long = dseg.dropna(subset=["likes"])[["time_kst", "member", "likes"]].rename(columns={"likes": "value"})
             if not long.empty:
                 p = plotting.plot_trend(long, "likes", session, KST, fname=f"M_{plotting._safe(session)}_likes.png")
-                notify.push(f"🔔 {session} | {C.METRIC_CN['likes']}", "", url=raw_url(p), image=raw_url(p), group=session)
+                queue_push(f"🔔 {session} | {C.METRIC_CN['likes']}", "", url=raw_url(p), image=raw_url(p), group=session)
         if want_table:
             longt = dseg.melt(id_vars=["timestamp_utc", "time_kst", "member"],
                               value_vars=C.METRICS, var_name="metric", value_name="value").dropna(subset=["value"])
             if not longt.empty:
                 tp = plotting.plot_table(longt, session, KST, fname=f"M_{plotting._safe(session)}_table.png")
-                notify.push(f"🔔 {session} | 데이터", "", url=raw_url(tp), image=raw_url(tp), group=session)
+                queue_push(f"🔔 {session} | 데이터", "", url=raw_url(tp), image=raw_url(tp), group=session)
         print(f"[手动推送] {session} 已推送")
 
 
 if __name__ == "__main__":
-    # 无论定时还是手动，都先跑 main()（采集+检测+里程碑，这些该推的会推）
+    # 1. 采集+检测+里程碑（图都生成好、推送先入队，不立即发）
     main()
-    # 是否执行"灵活全量推送"由 do_push 控制：
-    # - 你在 GitHub 网页手动 Run workflow：do_push 默认 'yes' → 推送
-    # - cron-job.org 外部定时：请求体显式传 do_push='no' → 只采集，不刷屏
+    # 2. 手动触发额外做灵活全量推送（由 do_push 控制，cron-job 传 no 不刷屏）
     _do_push = os.environ.get("MANUAL_DO_PUSH", "yes").strip().lower()
     _is_manual = os.environ.get("MANUAL_TRIGGER") == "true"
     if _is_manual and _do_push not in ("no", "false", "0", ""):
         manual_push()
+    # 3. 先把数据和图提交并推送到仓库（带冲突重试）
+    pushed_ok = commit_and_push()
+    # 4. 图已在线后，再统一发 Bark 通知（点开即有图，不再等/不再404）
+    if pushed_ok:
+        flush_pushes()
+    else:
+        # 万一 push 失败，仍尝试发通知（图可能稍后到），不让通知彻底丢失
+        print("[警告] 数据推送失败，仍尝试发送通知")
+        flush_pushes()

@@ -46,49 +46,63 @@
     "session": "0530 음악중심",
     "member": "상원",
     "start_utc": "2026-05-30T09:12:20.156003+00:00",
-    "pushed_milestones": [],
+    "pushed_milestones": [
+      0.5
+    ],
     "last_alert": {}
   },
   "0530 음악중심|||안신": {
     "session": "0530 음악중심",
     "member": "안신",
     "start_utc": "2026-05-30T09:12:20.156003+00:00",
-    "pushed_milestones": [],
+    "pushed_milestones": [
+      0.5
+    ],
     "last_alert": {}
   },
   "0530 음악중심|||씬롱": {
     "session": "0530 음악중심",
     "member": "씬롱",
     "start_utc": "2026-05-30T09:12:20.156003+00:00",
-    "pushed_milestones": [],
+    "pushed_milestones": [
+      0.5
+    ],
     "last_alert": {}
   },
   "0530 음악중심|||아르노": {
     "session": "0530 음악중심",
     "member": "아르노",
     "start_utc": "2026-05-30T09:12:20.156003+00:00",
-    "pushed_milestones": [],
+    "pushed_milestones": [
+      0.5
+    ],
     "last_alert": {}
   },
   "0530 음악중심|||리오": {
     "session": "0530 음악중심",
     "member": "리오",
     "start_utc": "2026-05-30T09:12:20.156003+00:00",
-    "pushed_milestones": [],
+    "pushed_milestones": [
+      0.5
+    ],
     "last_alert": {}
   },
   "0530 음악중심|||상현": {
     "session": "0530 음악중심",
     "member": "상현",
     "start_utc": "2026-05-30T09:12:20.156003+00:00",
-    "pushed_milestones": [],
+    "pushed_milestones": [
+      0.5
+    ],
     "last_alert": {}
   },
   "0530 음악중심|||준서": {
     "session": "0530 음악중심",
     "member": "준서",
     "start_utc": "2026-05-30T09:12:20.156003+00:00",
-    "pushed_milestones": [],
+    "pushed_milestones": [
+      0.5
+    ],
     "last_alert": {}
   }
 }

@@ -1,52 +1,78 @@
-  - name: Setup Python
-    uses: actions/setup-python@v5
-    with:
-      python-version: '3.12'
+name: YouTube Monitor
 
-  - name: Install Korean/CJK font
-    run: |
-      sudo apt-get update -qq
-      sudo apt-get install -y -qq fonts-noto-cjk fonts-noto-cjk-extra
-      # 兜底：从 CJK 合集提取 KR 子字体为独立 otf，避免 matplotlib 落到日文子集
-      pip install fonttools >/dev/null 2>&1 || true
-      python - <<'PY'
-      import glob, os
-      from fontTools.ttLib import TTFont
-      cands = glob.glob('/usr/share/fonts/**/NotoSansCJK-Regular.ttc', recursive=True) \
-            + glob.glob('/usr/share/fonts/**/NotoSansCJK*.ttc', recursive=True)
-      if cands:
-          try:
-              f = TTFont(cands[0], fontNumber=1)  # index 1 = KR
-              out = '/usr/share/fonts/opentype/noto/NotoSansKR-Regular.otf'
-              os.makedirs(os.path.dirname(out), exist_ok=True)
-              f.save(out)
-              print('extracted KR font ->', out)
-          except Exception as e:
-              print('extract skipped:', e)
-      PY
-      sudo fc-cache -f >/dev/null 2>&1 || true
+on:
+  schedule:
 
-  - name: Install deps
-    run: pip install -r requirements.txt
+   - cron: '*/5 * * * *'      # 每5分钟（GitHub 最小间隔；高峰可能略延迟）
+     workflow_dispatch: {}         # 允许手动触发，方便测试
 
-  - name: Run monitor
-    env:
-      YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
-      GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
-      SHEET_ID: ${{ secrets.SHEET_ID }}
-      BARK_KEY: ${{ secrets.BARK_KEY }}
-      BARK_SERVER: ${{ secrets.BARK_SERVER }}
-    run: python main.py
+# 让本工作流可以把数据 commit 回仓库
 
-  - name: Commit data
-    run: |
-      git config user.name "github-actions"
-      git config user.email "actions@github.com"
-      git add data/ || true
-      if ! git diff --staged --quiet; then
-        git commit -m "update data $(date -u +%FT%TZ)"
-        git pull --rebase --autostash || true
-        git push || (git pull --rebase --autostash && git push)
-      else
-        echo "无数据变化"
-      fi
+permissions:
+  contents: write
+
+# 避免两次运行同时写文件导致冲突
+
+concurrency:
+  group: ytb-monitor
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+    
+      - name: Install Korean/CJK font
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq fonts-noto-cjk fonts-noto-cjk-extra
+          # 兜底：从 CJK 合集提取 KR 子字体为独立 otf，避免 matplotlib 落到日文子集
+          pip install fonttools >/dev/null 2>&1 || true
+          python - <<'PY'
+          import glob, os
+          from fontTools.ttLib import TTFont
+          cands = glob.glob('/usr/share/fonts/**/NotoSansCJK-Regular.ttc', recursive=True) \
+                + glob.glob('/usr/share/fonts/**/NotoSansCJK*.ttc', recursive=True)
+          if cands:
+              try:
+                  f = TTFont(cands[0], fontNumber=1)  # index 1 = KR
+                  out = '/usr/share/fonts/opentype/noto/NotoSansKR-Regular.otf'
+                  os.makedirs(os.path.dirname(out), exist_ok=True)
+                  f.save(out)
+                  print('extracted KR font ->', out)
+              except Exception as e:
+                  print('extract skipped:', e)
+          PY
+          sudo fc-cache -f >/dev/null 2>&1 || true
+    
+      - name: Install deps
+        run: pip install -r requirements.txt
+    
+      - name: Run monitor
+        env:
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+          SHEET_ID: ${{ secrets.SHEET_ID }}
+          BARK_KEY: ${{ secrets.BARK_KEY }}
+          BARK_SERVER: ${{ secrets.BARK_SERVER }}
+        run: python main.py
+    
+      - name: Commit data
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add data/ || true
+          if ! git diff --staged --quiet; then
+            git commit -m "update data $(date -u +%FT%TZ)"
+            git pull --rebase --autostash || true
+            git push || (git pull --rebase --autostash && git push)
+          else
+            echo "无数据变化"
+          fi

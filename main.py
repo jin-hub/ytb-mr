@@ -1,4 +1,4 @@
--*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
 主程序：每次 GitHub Actions 运行执行一遍。
 """
@@ -256,7 +256,7 @@ def push_milestone(session, mh, df, start, keys, state):
     print(f"[里程碑] {session} {label} 已推送")
 
 
-if name == "__main__":
+if __name__ == "__main__":
     main()
     if os.environ.get("FORCE_PUSH") == "1":
         force_test_push()

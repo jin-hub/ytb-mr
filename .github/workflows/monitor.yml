@@ -2,16 +2,24 @@ name: YouTube Monitor
 
 on:
   schedule:
-
-   - cron: '*/5 * * * *'      # 每5分钟（GitHub 最小间隔；高峰可能略延迟）
-     workflow_dispatch: {}         # 允许手动触发，方便测试
-
-# 让本工作流可以把数据 commit 回仓库
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+    inputs:
+      session:
+        description: '场次标题(留空=所有运行中的场次)'
+        default: ''
+      start_time:
+        description: '起始时间 KST 如 2026-05-30 14:00(留空=从头)'
+        default: ''
+      end_time:
+        description: '结束时间 KST 如 2026-05-30 16:00(留空=到现在)'
+        default: ''
+      what:
+        description: '看什么 点赞,播放,数据表 多选逗号分隔(留空或all=全部)'
+        default: 'all'
 
 permissions:
   contents: write
-
-# 避免两次运行同时写文件导致冲突
 
 concurrency:
   group: ytb-monitor
@@ -28,12 +36,11 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-    
+
       - name: Install Korean/CJK font
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq fonts-noto-cjk fonts-noto-cjk-extra
-          # 兜底：从 CJK 合集提取 KR 子字体为独立 otf，避免 matplotlib 落到日文子集
           pip install fonttools >/dev/null 2>&1 || true
           python - <<'PY'
           import glob, os
@@ -42,7 +49,7 @@ jobs:
                 + glob.glob('/usr/share/fonts/**/NotoSansCJK*.ttc', recursive=True)
           if cands:
               try:
-                  f = TTFont(cands[0], fontNumber=1)  # index 1 = KR
+                  f = TTFont(cands[0], fontNumber=1)
                   out = '/usr/share/fonts/opentype/noto/NotoSansKR-Regular.otf'
                   os.makedirs(os.path.dirname(out), exist_ok=True)
                   f.save(out)
@@ -51,10 +58,10 @@ jobs:
                   print('extract skipped:', e)
           PY
           sudo fc-cache -f >/dev/null 2>&1 || true
-    
+
       - name: Install deps
         run: pip install -r requirements.txt
-    
+
       - name: Run monitor
         env:
           YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
@@ -62,8 +69,13 @@ jobs:
           SHEET_ID: ${{ secrets.SHEET_ID }}
           BARK_KEY: ${{ secrets.BARK_KEY }}
           BARK_SERVER: ${{ secrets.BARK_SERVER }}
+          MANUAL_SESSION: ${{ github.event.inputs.session }}
+          MANUAL_START: ${{ github.event.inputs.start_time }}
+          MANUAL_END: ${{ github.event.inputs.end_time }}
+          MANUAL_WHAT: ${{ github.event.inputs.what }}
+          MANUAL_TRIGGER: ${{ github.event_name == 'workflow_dispatch' }}
         run: python main.py
-    
+
       - name: Commit data
         run: |
           git config user.name "github-actions"

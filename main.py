@@ -1,4 +1,4 @@
--*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
 主程序：每次 GitHub Actions 运行执行一遍。
 """

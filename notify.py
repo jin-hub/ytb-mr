@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 """
 Bark 推送。
-- 用 image 参数让图片直接显示在通知里（下拉通知即可看图，无需点链接跳转）
-- 同时保留 url，长按/点开仍可跳浏览器看高清原图
-- 支持多个 Bark key（推给你和朋友），BARK_KEY 里用英文逗号分隔多个 key 即可
+- 用 image 参数让图片直接显示在通知里（下拉通知即可看图）
+- 不再传 url 参数：点通知只进 App 看图，不会跳浏览器
+- 图片链接以纯文本形式拼在 body 末尾（黑色文字、不变蓝，长按可复制兜底）
+- 支持多个 Bark key（推给你和朋友），BARK_KEY 里用英文逗号分隔
 """
 import os
 import requests
@@ -11,30 +12,34 @@ import requests
 
 def _keys():
     raw = os.environ.get("BARK_KEY", "")
-    # 支持用逗号分隔多个 key：key1,key2
     return [k.strip() for k in raw.split(",") if k.strip()]
 
 
-def push(title, body, url=None, group=None, image=None):
+def push(title, body, url=None, group=None, image=None, link_in_body=None):
     """
     title/body: 通知标题与正文
-    url: 点击通知后打开的链接（高清原图）
     image: 直接显示在通知里的图片 URL（下拉即看）
     group: 通知分组（按场分组）
+    link_in_body: 若提供，把该链接作为纯文本拼到 body 末尾（不变蓝、不跳转）
+    url: 兼容旧调用；为避免点击跳浏览器，这里【不再发送】url 参数
     """
     base = os.environ.get("BARK_SERVER", "https://api.day.app").rstrip("/")
+
+    # 把链接以纯文本放到正文末尾（黑色、可长按复制；不放进 url 参数所以不变蓝/不跳转）
+    final_body = body or ""
+    if link_in_body:
+        final_body = (final_body + "\n" + link_in_body) if final_body else link_in_body
+
     ok_all = True
     for key in _keys():
-        # 用 POST + JSON，避免 URL 里中文/韩文编码问题
         payload = {
             "title": title,
-            "body": body,
+            "body": final_body,
             "isArchive": 1,
         }
         if image:
             payload["image"] = image      # 通知里直接显示图片
-        if url:
-            payload["url"] = url          # 点击跳转看原图
+        # 注意：故意不再设置 payload["url"]，点通知只进 App 不跳浏览器
         if group:
             payload["group"] = group
         endpoint = f"{base}/{key}"

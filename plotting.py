@@ -83,6 +83,13 @@ def plot_trend(df_session, metric, session, kst_tz, window=None, fname=None, tit
     _ensure()
     fig, ax = plt.subplots(figsize=(12, 7), dpi=140)
 
+    # 先清洗：value 转数值，剔除空值和 <=0 的点。
+    # 有播放量的视频不可能 0 播放/0 赞，数据里的 0 一定是 API 抽风留下的脏数据，
+    # 画图时一律跳过，避免出现直插到 0 又弹回的假尖刺。
+    df_session = df_session.copy()
+    df_session["value"] = pd.to_numeric(df_session["value"], errors="coerce")
+    df_session = df_session[df_session["value"].notna() & (df_session["value"] > 0)]
+
     members = list(dict.fromkeys(df_session["member"].tolist()))
     plotted = 0
     for idx, m in enumerate(members):
@@ -188,8 +195,9 @@ def plot_rank_table(snap_df, session, title, fname=None):
     df["views"] = pd.to_numeric(df["views"], errors="coerce")
     df["likes"] = pd.to_numeric(df["likes"], errors="coerce")
 
-    views_rank = df.dropna(subset=["views"]).sort_values("views", ascending=False)
-    likes_rank = df.dropna(subset=["likes"]).sort_values("likes", ascending=False)
+    # 排除空值和 0（0 是 API 抽风脏数据，不参与排名）
+    views_rank = df[df["views"].notna() & (df["views"] > 0)].sort_values("views", ascending=False)
+    likes_rank = df[df["likes"].notna() & (df["likes"] > 0)].sort_values("likes", ascending=False)
 
     n = max(len(views_rank), len(likes_rank))
     fig, ax = plt.subplots(figsize=(8, 1.0 + 0.45 * max(n, 1)), dpi=150)

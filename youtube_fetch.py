@@ -33,9 +33,15 @@ def fetch_stats(video_ids):
             snippet = item.get("snippet", {})
             views = stats.get("viewCount")
             likes = stats.get("likeCount")
+            views_int = int(views) if views is not None else None
+            likes_int = int(likes) if likes is not None else None
+            # 防 API 偶发抽风：有播放量却 likeCount=0 或缺失，几乎一定是接口没返回，
+            # 不是真的 0 赞 → 记为缺失(None)，写入时存空，图上该点跳过，不污染趋势。
+            if likes_int == 0 and views_int and views_int > 0:
+                likes_int = None
             result[vid] = {
-                "views": int(views) if views is not None else None,
-                "likes": int(likes) if likes is not None else None,
+                "views": views_int,
+                "likes": likes_int,
                 "published": snippet.get("publishedAt"),
                 "title": snippet.get("title", ""),
             }

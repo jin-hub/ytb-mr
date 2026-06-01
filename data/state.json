@@ -174,5 +174,17 @@
       360,
       1440
     ]
+  },
+  "0530 MBC|||상원": {
+    "session": "0530 MBC",
+    "member": "상원",
+    "start_utc": "2026-06-01T05:50:47.202208+00:00",
+    "pushed_milestones": []
+  },
+  "0530 MBC|||씬롱": {
+    "session": "0530 MBC",
+    "member": "씬롱",
+    "start_utc": "2026-06-01T05:50:47.202208+00:00",
+    "pushed_milestones": []
   }
 }

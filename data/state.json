@@ -205,42 +205,56 @@
     "session": "0531 SBS 인기가요",
     "member": "상원",
     "start_utc": "2026-06-01T10:10:55.467259+00:00",
-    "pushed_milestones": []
+    "pushed_milestones": [
+      30
+    ]
   },
   "0531 SBS 인기가요|||안신": {
     "session": "0531 SBS 인기가요",
     "member": "안신",
     "start_utc": "2026-06-01T10:10:55.467259+00:00",
-    "pushed_milestones": []
+    "pushed_milestones": [
+      30
+    ]
   },
   "0531 SBS 인기가요|||씬롱": {
     "session": "0531 SBS 인기가요",
     "member": "씬롱",
     "start_utc": "2026-06-01T10:10:55.467259+00:00",
-    "pushed_milestones": []
+    "pushed_milestones": [
+      30
+    ]
   },
   "0531 SBS 인기가요|||아르노": {
     "session": "0531 SBS 인기가요",
     "member": "아르노",
     "start_utc": "2026-06-01T10:10:55.467259+00:00",
-    "pushed_milestones": []
+    "pushed_milestones": [
+      30
+    ]
   },
   "0531 SBS 인기가요|||리오": {
     "session": "0531 SBS 인기가요",
     "member": "리오",
     "start_utc": "2026-06-01T10:10:55.467259+00:00",
-    "pushed_milestones": []
+    "pushed_milestones": [
+      30
+    ]
   },
   "0531 SBS 인기가요|||상현": {
     "session": "0531 SBS 인기가요",
     "member": "상현",
     "start_utc": "2026-06-01T10:10:55.467259+00:00",
-    "pushed_milestones": []
+    "pushed_milestones": [
+      30
+    ]
   },
   "0531 SBS 인기가요|||준서": {
     "session": "0531 SBS 인기가요",
     "member": "준서",
     "start_utc": "2026-06-01T10:10:55.467259+00:00",
-    "pushed_milestones": []
+    "pushed_milestones": [
+      30
+    ]
   }
 }

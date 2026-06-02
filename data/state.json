@@ -334,12 +334,16 @@
     "session": "0531 SBS Facecam",
     "member": "상원",
     "start_utc": "2026-06-02T12:15:45.133501+00:00",
-    "pushed_milestones": []
+    "pushed_milestones": [
+      30
+    ]
   },
   "0531 SBS Facecam|||안신": {
     "session": "0531 SBS Facecam",
     "member": "안신",
     "start_utc": "2026-06-02T12:15:45.133501+00:00",
-    "pushed_milestones": []
+    "pushed_milestones": [
+      30
+    ]
   }
 }

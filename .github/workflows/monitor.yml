@@ -37,15 +37,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0          # 完整历史，供 Python 内部 rebase/push 使用
+          fetch-depth: 1          # 浅克隆即可：main.py 内部用 git fetch+rebase 时会按需补取远程引用
           persist-credentials: true
 
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+          cache: 'pip'            # 缓存 pip 下载，requirements.txt 不变时秒装
 
-      - name: Install Korean/CJK font
+      - name: Cache CJK/Korean fonts
+        id: font-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/noto-fonts-cache
+          key: noto-cjk-kr-v1
+
+      - name: Install Korean/CJK font (cache miss)
+        if: steps.font-cache.outputs.cache-hit != 'true'
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq fonts-noto-cjk fonts-noto-cjk-extra
@@ -66,6 +75,18 @@ jobs:
               except Exception as e:
                   print('extract skipped:', e)
           PY
+          # 把装好/提取好的字体存进缓存目录，供下次命中直接复用
+          mkdir -p ~/noto-fonts-cache
+          find /usr/share/fonts -name 'NotoSansCJK*' -exec cp {} ~/noto-fonts-cache/ \; 2>/dev/null || true
+          cp /usr/share/fonts/opentype/noto/NotoSansKR-Regular.otf ~/noto-fonts-cache/ 2>/dev/null || true
+          sudo fc-cache -f >/dev/null 2>&1 || true
+
+      - name: Restore fonts from cache (cache hit)
+        if: steps.font-cache.outputs.cache-hit == 'true'
+        run: |
+          # 命中缓存：直接把字体铺回系统目录，跳过 apt 和提取（省 1-3 分钟）
+          sudo mkdir -p /usr/share/fonts/opentype/noto
+          sudo cp ~/noto-fonts-cache/* /usr/share/fonts/opentype/noto/ 2>/dev/null || true
           sudo fc-cache -f >/dev/null 2>&1 || true
 
       - name: Install deps

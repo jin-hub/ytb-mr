@@ -1,76 +1,4 @@
 {
-  "0530 MCOUNTDOWN 가로 직캠|||상원": {
-    "session": "0530 MCOUNTDOWN 가로 직캠",
-    "member": "상원",
-    "start_utc": "2026-05-30T13:40:50.478030+00:00",
-    "pushed_milestones": [
-      30,
-      60,
-      90,
-      120,
-      180,
-      240,
-      300,
-      360,
-      1440,
-      2880,
-      4320
-    ]
-  },
-  "0530 MCOUNTDOWN 가로 직캠|||씬롱": {
-    "session": "0530 MCOUNTDOWN 가로 직캠",
-    "member": "씬롱",
-    "start_utc": "2026-05-30T13:40:50.478030+00:00",
-    "pushed_milestones": [
-      30,
-      60,
-      90,
-      120,
-      180,
-      240,
-      300,
-      360,
-      1440,
-      2880,
-      4320
-    ]
-  },
-  "0530 MCOUNTDOWN 가로 직캠|||아르노": {
-    "session": "0530 MCOUNTDOWN 가로 직캠",
-    "member": "아르노",
-    "start_utc": "2026-05-30T13:40:50.478030+00:00",
-    "pushed_milestones": [
-      30,
-      60,
-      90,
-      120,
-      180,
-      240,
-      300,
-      360,
-      1440,
-      2880,
-      4320
-    ]
-  },
-  "0530 MCOUNTDOWN 가로 직캠|||준서": {
-    "session": "0530 MCOUNTDOWN 가로 직캠",
-    "member": "준서",
-    "start_utc": "2026-05-30T13:40:50.478030+00:00",
-    "pushed_milestones": [
-      30,
-      60,
-      90,
-      120,
-      180,
-      240,
-      300,
-      360,
-      1440,
-      2880,
-      4320
-    ]
-  },
   "0530 음악중심|||상원": {
     "session": "0530 음악중심",
     "member": "상원",
@@ -381,5 +309,53 @@
       360,
       1440
     ]
+  },
+  "0603 Show Champion|||상원": {
+    "session": "0603 Show Champion",
+    "member": "상원",
+    "start_utc": "2026-06-03T13:20:40.836490+00:00",
+    "pushed_milestones": []
+  },
+  "0603 Show Champion|||안신": {
+    "session": "0603 Show Champion",
+    "member": "안신",
+    "start_utc": "2026-06-03T13:20:40.836490+00:00",
+    "pushed_milestones": []
+  },
+  "0603 Show Champion|||씬롱": {
+    "session": "0603 Show Champion",
+    "member": "씬롱",
+    "start_utc": "2026-06-03T13:20:40.836490+00:00",
+    "pushed_milestones": []
+  },
+  "0603 Show Champion|||아르노": {
+    "session": "0603 Show Champion",
+    "member": "아르노",
+    "start_utc": "2026-06-03T13:20:40.836490+00:00",
+    "pushed_milestones": []
+  },
+  "0603 Show Champion|||리오": {
+    "session": "0603 Show Champion",
+    "member": "리오",
+    "start_utc": "2026-06-03T13:20:40.836490+00:00",
+    "pushed_milestones": []
+  },
+  "0603 Show Champion|||상현": {
+    "session": "0603 Show Champion",
+    "member": "상현",
+    "start_utc": "2026-06-03T13:20:40.836490+00:00",
+    "pushed_milestones": []
+  },
+  "0603 Show Champion|||준서": {
+    "session": "0603 Show Champion",
+    "member": "준서",
+    "start_utc": "2026-06-03T13:20:40.836490+00:00",
+    "pushed_milestones": []
+  },
+  "0603 Show Champion|||상원(가로)": {
+    "session": "0603 Show Champion",
+    "member": "상원(가로)",
+    "start_utc": "2026-06-03T13:20:40.836490+00:00",
+    "pushed_milestones": []
   }
 }

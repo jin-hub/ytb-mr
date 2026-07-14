@@ -6,7 +6,7 @@ Codex 不碰 git commit/push。
 
 ## 会话开始时(使用 codex 前必做)
 
-1. 运行 `bash scripts/restore-codex-auth.sh` 恢复 codex 登录态。
+1. 运行 `bash restore-codex-auth.sh` 恢复 codex 登录态。
 2. 若脚本失败且环境变量 `CODEX_AUTH_JSON` 不存在,则后台运行
    `codex login --device-auth`,把授权 URL 和一次性代码转告用户,等待完成。
 

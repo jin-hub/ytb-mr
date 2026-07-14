@@ -20,6 +20,9 @@ on:
       do_push:
         description: '是否推送(yes=推送 / no=只采集，外部定时用)'
         default: 'yes'
+      force:
+        description: '强制运行一次(yes=忽略总开关)'
+        default: ''
 
 # 让本工作流可以把数据 commit 回仓库
 permissions:
@@ -32,6 +35,8 @@ concurrency:
 
 jobs:
   run:
+    # 总开关是仓库变量 MONITOR_ENABLED（Settings → Secrets and variables → Actions → Variables），设为 true 才运行；未设置或非 true 时所有触发（含外部定时的 workflow_dispatch）都直接跳过；手动填 force=yes 可单次绕过开关。
+    if: ${{ vars.MONITOR_ENABLED == 'true' || inputs.force == 'yes' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

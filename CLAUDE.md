@@ -1,1 +1,1 @@
-@.claude/codex-workflow.md
+@codex-workflow.md

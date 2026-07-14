@@ -15,5 +15,12 @@ Rules:
   before finishing, and report its real result honestly.
 - Keep diffs minimal and match the existing code style of this repository.
 
-<!-- 在真实业务仓库中,请在此文件追加业务背景:技术栈、目录结构、
-     编码规范、禁改目录、测试命令等,codex 每次启动都会自动读取本文件。 -->
+## 项目背景
+
+- 技术栈：Python 3.12、pandas、matplotlib、gspread、requests。
+- 目录结构：`src/` 为源码，其中 `datasource/` 负责数据源、`output/` 负责出图与推送；`data/` 为运行数据（禁改）；`docs/` 存放文档；`scripts/` 存放脚本。
+- 入口：`python src/main.py`。
+- 验证命令：
+  `python3 -m py_compile src/main.py src/config.py src/storage.py src/datasource/sheet_reader.py src/datasource/youtube_fetch.py src/output/plotting.py src/output/notify.py`
+  `SHEET_ID=dummy python3 -c "import sys; sys.path.insert(0,'src'); import main, storage; from output import plotting; print(storage.DATA_DIR); print(plotting.OUT_DIR)"`
+  `python3 -c "import yaml; yaml.safe_load(open('.github/workflows/monitor.yml'))"`

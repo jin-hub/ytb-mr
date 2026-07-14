@@ -12,7 +12,8 @@ import json
 import csv
 from datetime import datetime
 
-DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA_DIR = os.path.join(_REPO_ROOT, 'data')
 TS_FILE = os.path.join(DATA_DIR, "timeseries.csv")
 STATE_FILE = os.path.join(DATA_DIR, "state.json")
 

@@ -17,13 +17,14 @@ import pandas as pd
 from zoneinfo import ZoneInfo
 
 import config as C
-import sheet_reader
-import youtube_fetch
+from datasource import sheet_reader
+from datasource import youtube_fetch
 import storage
-import plotting
-import notify
+from output import plotting
+from output import notify
 
 KST = ZoneInfo(C.TIMEZONE)
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REPO = os.environ.get("GITHUB_REPOSITORY", "")          # "user/repo"
 BRANCH = os.environ.get("GITHUB_REF_NAME", "main")
 SHEET_ID = os.environ["SHEET_ID"]
@@ -55,8 +56,7 @@ def flush_pushes():
 
 def raw_url(rel_path):
     """把仓库内文件路径转成可公开访问的 raw 链接（看高清图用）。"""
-    rel = rel_path.split("ytb-monitor/")[-1] if "ytb-monitor/" in rel_path else os.path.basename(rel_path)
-    rel = os.path.relpath(rel_path, os.path.dirname(__file__))
+    rel = os.path.relpath(rel_path, REPO_ROOT)
     return f"https://raw.githubusercontent.com/{REPO}/{BRANCH}/{rel}"
 
 
@@ -77,7 +77,7 @@ def commit_and_push():
     import subprocess
 
     def run(cmd):
-        return subprocess.run(cmd, shell=True, cwd=os.path.dirname(__file__) or ".",
+        return subprocess.run(cmd, shell=True, cwd=REPO_ROOT,
                               capture_output=True, text=True)
 
     run('git config user.name "github-actions"')

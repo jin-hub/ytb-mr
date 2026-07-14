@@ -7,6 +7,7 @@
 - 触发：GitHub Actions（`.github/workflows/monitor.yml`），有两种触发：仓库自带 schedule cron（每 5 分钟）+ 外部定时服务调用 `workflow_dispatch`（每 5 分钟，传 `do_push=no`）。
 - 总开关：仓库变量 `MONITOR_ENABLED`。在 GitHub 仓库 Settings → Secrets and variables → Actions → Variables 里把 `MONITOR_ENABLED` 设为 `true` 即开启；删除该变量或设为其他值即关闭（所有触发都会跳过，不消耗 Actions 时长）。单次强制运行：手动 Run workflow 时把 `force` 填 `yes`。
 - 数据持久化：每轮运行把 `data/` 下的 CSV 和图表 commit 回仓库本身（`main.py` 的 `commit_and_push`，带 rebase 冲突重试）。
+- 入口命令：`python src/main.py`。
 
 ## 一次运行的流程（main.py）
 
@@ -20,18 +21,26 @@
 
 ## 文件说明
 
+```
+src/
+├── datasource/  # Google 表格和 YouTube 数据源
+└── output/      # 出图与推送
+docs/            # 文档和模板
+scripts/         # 辅助脚本
+```
+
 | 文件/目录 | 说明 |
 | --- | --- |
-| `main.py` | 主流程编排。 |
-| `config.py` | 里程碑、时区、自动停止等配置。 |
-| `sheet_reader.py` | 读取 Google 表格监控列表，只取“运行”状态行。 |
-| `youtube_fetch.py` | 使用 YouTube Data API v3 批量抓取 views/likes；likes=0 视作接口缺失。 |
-| `storage.py` | `data/` 读写，容忍 `timeseries.csv` 中的 git 冲突标记。 |
-| `plotting.py` | 用 matplotlib 绘制趋势图、数据表和排名表，并配置韩文字体。 |
-| `notify.py` | Bark 推送，支持多个 key。 |
-| `Google表格模板.csv` | 表格模板：场次标题、成员名、YouTube 链接、状态。 |
+| `src/main.py` | 主流程编排。 |
+| `src/config.py` | 里程碑、时区、自动停止等配置。 |
+| `src/datasource/sheet_reader.py` | 读取 Google 表格监控列表，只取“运行”状态行。 |
+| `src/datasource/youtube_fetch.py` | 使用 YouTube Data API v3 批量抓取 views/likes；likes=0 视作接口缺失。 |
+| `src/storage.py` | `data/` 读写，容忍 `timeseries.csv` 中的 git 冲突标记。 |
+| `src/output/plotting.py` | 用 matplotlib 绘制趋势图、数据表和排名表，并配置韩文字体。 |
+| `src/output/notify.py` | Bark 推送，支持多个 key。 |
+| `docs/Google表格模板.csv` | 表格模板：场次标题、成员名、YouTube 链接、状态。 |
 | `data/` | `timeseries.csv`、`state.json` 和 `charts/` 生成的图；自动 commit。 |
-| `restore-codex-auth.sh` | 恢复 codex CLI 登录态。 |
+| `scripts/restore-codex-auth.sh` | 恢复 codex CLI 登录态。 |
 | `codex-workflow.md` | Claude × Codex 协作流程。 |
 | `AGENTS.md` | 给 codex 的实现规则。 |
 

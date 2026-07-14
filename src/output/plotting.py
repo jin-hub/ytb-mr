@@ -54,7 +54,8 @@ def _fp():
 PALETTE = ["#4F8DFD", "#F2776B", "#2BB673", "#9B59B6", "#E67E22",
            "#1ABC9C", "#34495E", "#E84393"]
 
-OUT_DIR = os.path.join(os.path.dirname(__file__), "data", "charts")
+_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+OUT_DIR = os.path.join(_REPO_ROOT, 'data', 'charts')
 
 
 def _ensure():
